@@ -1,0 +1,14 @@
+# Swift / SwiftPM
+.build/
+build/
+*.xcodeproj
+.swiftpm/
+.DS_Store
+
+# Rust
+cross/target/
+cross/target-linux/
+
+# npm
+node_modules/
+cross/dist/

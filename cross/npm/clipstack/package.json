@@ -1,0 +1,31 @@
+{
+  "name": "clipstack",
+  "version": "0.1.0",
+  "description": "A clipboard stack in your menubar/tray: every copy is pushed, one hotkey pops and pastes. macOS, Windows, Linux.",
+  "license": "MIT",
+  "bin": {
+    "clipstack": "bin/clipstack.js"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@clipstack/darwin-arm64": "0.1.0",
+    "@clipstack/darwin-x64": "0.1.0",
+    "@clipstack/win32-x64": "0.1.0",
+    "@clipstack/linux-x64": "0.1.0",
+    "@clipstack/linux-arm64": "0.1.0"
+  },
+  "keywords": [
+    "clipboard",
+    "clipboard-manager",
+    "paste",
+    "stack",
+    "menubar",
+    "tray"
+  ]
+}

@@ -1,0 +1,119 @@
+name: Release (cross-platform binaries + npm)
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            npm_os: darwin
+            npm_arch: arm64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            npm_os: darwin
+            npm_arch: x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            npm_os: win32
+            npm_arch: x64
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            npm_os: linux
+            npm_arch: x64
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            npm_os: linux
+            npm_arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libxdo-dev libxkbcommon-dev libxi-dev libxtst-dev
+
+      - name: Build
+        working-directory: cross
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package for npm
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$VERSION" == "$GITHUB_REF_NAME" ]] && VERSION="0.0.0-dev"
+          EXE=clipstack; [[ "${{ matrix.npm_os }}" == "win32" ]] && EXE=clipstack.exe
+          node cross/npm/scripts/make-platform-package.js \
+            ${{ matrix.npm_os }} ${{ matrix.npm_arch }} \
+            cross/target/${{ matrix.target }}/release/$EXE "$VERSION" dist
+          # Standalone archive for the GitHub release too
+          mkdir -p release
+          cp cross/target/${{ matrix.target }}/release/$EXE release/
+          cd release && tar czf ../clipstack-${{ matrix.target }}.tar.gz $EXE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkg-${{ matrix.npm_os }}-${{ matrix.npm_arch }}
+          path: dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: archive-${{ matrix.target }}
+          path: clipstack-${{ matrix.target }}.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: GitHub release with binaries
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/archive-*/*.tar.gz
+          generate_release_notes: true
+
+      - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for d in artifacts/pkg-*/*/; do
+            echo "publishing $d"
+            (cd "$d" && npm publish --access public)
+          done
+
+      - name: Publish main package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: cross/npm/clipstack
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$VERSION" --no-git-tag-version
+          node -e '
+            const fs=require("fs"); const p=JSON.parse(fs.readFileSync("package.json"));
+            for (const k of Object.keys(p.optionalDependencies)) p.optionalDependencies[k]=process.argv[1];
+            fs.writeFileSync("package.json", JSON.stringify(p,null,2)+"\n");
+          ' "$VERSION"
+          npm publish --access public
