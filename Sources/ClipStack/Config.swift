@@ -15,6 +15,10 @@ struct Config: Codable {
     var pollInterval: Double = 0.2
     /// Show the item count next to the menubar icon.
     var showCountInMenubar: Bool = true
+    /// Which end of the stack the main paste hotkey takes: "lifo" (newest first, default)
+    /// or "fifo" (oldest first — paste in the order you copied). The second paste hotkey
+    /// always takes the other end. Also switchable from the menu.
+    var pasteOrder: String = "lifo"
     /// Global hotkeys. Format: modifiers joined by "+", then the key.
     /// Modifiers: cmd, ctrl, alt (or option), shift.
     /// Keys: a-z, 0-9, f1-f12, space, return, tab, escape, backspace, delete,
@@ -52,6 +56,7 @@ struct Config: Codable {
         persistHistory     = try c.decodeIfPresent(Bool.self,    forKey: .persistHistory)     ?? persistHistory
         pollInterval       = try c.decodeIfPresent(Double.self,  forKey: .pollInterval)       ?? pollInterval
         showCountInMenubar = try c.decodeIfPresent(Bool.self,    forKey: .showCountInMenubar) ?? showCountInMenubar
+        pasteOrder         = try c.decodeIfPresent(String.self,  forKey: .pasteOrder)         ?? pasteOrder
         hotkeys            = try c.decodeIfPresent(Hotkeys.self, forKey: .hotkeys)            ?? hotkeys
     }
 

@@ -25,6 +25,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Largest RTF/HTML payload (bytes) kept per item.
     private let richFlavourLimit = 2_000_000
 
+    /// True when the main paste hotkey takes the oldest item (FIFO) instead of the newest.
+    private var isFIFO: Bool { config.pasteOrder.lowercased() == "fifo" }
+
     /// How hotkeys are delivered. The event tap is preferred (needs Accessibility);
     /// Carbon hotkeys are the fallback until permission is granted.
     private enum HotkeyMode { case eventTap, carbon }
@@ -148,14 +151,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return CGKeyCode(b.keyCode) == keyCode && b.cgModifiers == modifiers
         }
 
-        let isNewest = matches(bindNewest)
-        let isOldest = !isNewest && matches(bindOldest)
-        if isNewest || isOldest {
+        let isPrimary = matches(bindNewest)
+        let isSecondary = !isPrimary && matches(bindOldest)
+        if isPrimary || isSecondary {
             if autorepeat { return .swallow }   // holding the key must not drain the stack
-            if let item = isNewest ? store.popNewest() : store.popOldest() {
+            // Primary key follows the configured order; the secondary key takes the other end.
+            let takeNewest = isPrimary != isFIFO
+            if let item = takeNewest ? store.popNewest() : store.popOldest() {
                 copyQuietly(item)
                 updateMenubarTitle()
-                Log.info("tap: \(isNewest ? "popped newest" : "popped oldest") \(item.text.count) chars\(item.isRich ? " (rich)" : "") -> ⌘V, stack=\(store.stackCount)")
+                Log.info("tap: \(takeNewest ? "popped newest" : "popped oldest") \(item.text.count) chars\(item.isRich ? " (rich)" : "") -> ⌘V, stack=\(store.stackCount)")
             } else {
                 Log.info("tap: stack empty -> normal paste")
             }
@@ -175,14 +180,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Stack actions (Carbon fallback path)
 
     private func pasteNewest() {
-        Log.info("hotkey pasteNewest fired, stack=\(store.stackCount)")
-        guard let item = store.popNewest() else { NSSound.beep(); return }
+        Log.info("hotkey primary paste fired, stack=\(store.stackCount)")
+        guard let item = isFIFO ? store.popOldest() : store.popNewest() else { NSSound.beep(); return }
         paste(item)
     }
 
     private func pasteOldest() {
-        Log.info("hotkey pasteOldest fired, stack=\(store.stackCount)")
-        guard let item = store.popOldest() else { NSSound.beep(); return }
+        Log.info("hotkey secondary paste fired, stack=\(store.stackCount)")
+        guard let item = isFIFO ? store.popNewest() : store.popOldest() else { NSSound.beep(); return }
         paste(item)
     }
 
@@ -257,13 +262,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let history = store.unpinnedHistory
 
         menu.addItem(header("click copies  ·  ☆ stars (keep always)  ·  ⌥-click pastes  ·  ⌘-click removes"))
+
+        let order = NSMenuItem(
+            title: isFIFO
+                ? "Paste order: oldest first (FIFO)  —  switch to newest first"
+                : "Paste order: newest first (LIFO)  —  switch to oldest first",
+            action: #selector(menuToggleOrder), keyEquivalent: "")
+        order.target = self
+        menu.addItem(order)
         menu.addItem(.separator())
 
         // Stack
         if stackItems.isEmpty {
             menu.addItem(header("STACK — empty, copy something"))
         } else {
-            menu.addItem(header("STACK (\(stackItems.count) of \(config.maxItems)) — ⌘⌃V pops the top"))
+            let n = bindNewest?.display ?? "—"
+            menu.addItem(header("STACK (\(stackItems.count) of \(config.maxItems)) — \(n) pastes the \(isFIFO ? "oldest (bottom)" : "newest (top)")"))
             for item in stackItems.prefix(maxStackRows) {
                 addRows(for: item, to: menu, onStack: true)
             }
@@ -374,7 +388,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func hotkeySummary() -> String {
         let n = HotKeyParser.parse(config.hotkeys.pasteNewest)?.display ?? "—"
         let o = HotKeyParser.parse(config.hotkeys.pasteOldest)?.display ?? "—"
-        return "Hotkeys: pop newest \(n) · pop oldest \(o)"
+        return isFIFO
+            ? "Hotkeys: \(n) oldest first · \(o) newest first"
+            : "Hotkeys: \(n) newest first · \(o) oldest first"
     }
 
     // The menu closes before the action runs, but the previously frontmost
@@ -386,6 +402,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Menu actions
 
     @objc private func menuClearStack() { clearStack() }
+
+    @objc private func menuToggleOrder() {
+        config.pasteOrder = isFIFO ? "lifo" : "fifo"
+        config.save()
+        Log.info("paste order -> \(config.pasteOrder)")
+    }
     @objc private func menuOpenConfig() { openConfig() }
     @objc private func menuReloadConfig() { reloadConfig() }
     @objc private func menuRequestAX() { Paster.requestAccessibility() }

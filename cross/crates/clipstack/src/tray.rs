@@ -60,13 +60,30 @@ fn build_menu(shared: &Shared) -> Menu {
     let newest = shared.bindings.newest.as_ref().map(|b| b.display.clone()).unwrap_or("—".into());
     let oldest = shared.bindings.oldest.as_ref().map(|b| b.display.clone()).unwrap_or("—".into());
 
+    let fifo = shared.config.is_fifo();
+
     header(&menu, "click a row to copy it");
+    let _ = menu.append(&MenuItem::with_id(
+        "toggle_order",
+        if fifo {
+            "Paste order: oldest first (FIFO)  —  switch to newest first"
+        } else {
+            "Paste order: newest first (LIFO)  —  switch to oldest first"
+        },
+        true,
+        None,
+    ));
     sep(&menu);
 
     if stack.is_empty() {
         header(&menu, "STACK — empty, copy something");
     } else {
-        header(&menu, &format!("STACK ({} of {}) — {newest} pops the top", stack.len(), shared.config.max_items));
+        header(&menu, &format!(
+            "STACK ({} of {}) — {newest} pastes the {}",
+            stack.len(),
+            shared.config.max_items,
+            if fifo { "oldest (bottom)" } else { "newest (top)" }
+        ));
         for it in stack.iter().take(MAX_STACK_ROWS) {
             row(&menu, it);
         }
@@ -125,7 +142,11 @@ fn build_menu(shared: &Shared) -> Menu {
     let _ = menu.append(&MenuItem::with_id("clear_history", "Clear history (starred stay)", !history.is_empty(), None));
 
     sep(&menu);
-    header(&menu, &format!("Hotkeys: pop newest {newest} · pop oldest {oldest}"));
+    header(&menu, &if fifo {
+        format!("Hotkeys: {newest} oldest first · {oldest} newest first")
+    } else {
+        format!("Hotkeys: {newest} newest first · {oldest} oldest first")
+    });
     let _ = menu.append(&MenuItem::with_id("edit_config", "Edit config…", true, None));
     let _ = menu.append(&MenuItem::with_id("reload_config", "Reload config", true, None));
     if !crate::platform::input_permission_granted() {

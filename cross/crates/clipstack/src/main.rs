@@ -246,6 +246,12 @@ impl Ctx {
                     shared.store.remove(&u);
                     shared.menu_dirty = true;
                 }
+                ("toggle_order", _) => {
+                    shared.config.paste_order = if shared.config.is_fifo() { "lifo".into() } else { "fifo".into() };
+                    shared.config.save();
+                    shared.menu_dirty = true;
+                    log::info!("paste order -> {}", shared.config.paste_order);
+                }
                 ("clear_stack", _) => {
                     shared.store.clear_stack();
                     shared.menu_dirty = true;

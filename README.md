@@ -1,60 +1,94 @@
 # ClipStack
 
-A tiny macOS menubar app that turns the clipboard into a stack.
+**A clipboard stack for your menubar / tray.** Copy, copy, copy — then one hotkey pastes
+them back one at a time. Newest first (LIFO) or in the order you copied (FIFO), your call.
 
-- **⌘C** works exactly as before. Every copy is also pushed onto the stack.
-- **⌘V** works exactly as before (pastes the last thing you copied).
-- **⌘⌃V** pops the newest item off the stack and pastes it (LIFO).
-- **⌘⌃⇧V** pops the oldest item and pastes it (FIFO — paste in the order you copied).
-- **⌘⌃⌫** clears the stack. **⌘⌃L** opens the menu to see what's on it.
+```
+copy A · copy B · copy C          →  stack: [A, B, C]      menubar: 📋3
+⌘⌃V  ⌘⌃V  ⌘⌃V                      →  pastes C, B, A       (or A, B, C in FIFO mode)
+```
 
-Popping an item takes it off the stack but **keeps it in history**. Click the 📋 icon to see
-three sections — **Stack** (not yet pasted), **★ Starred** (kept always), **History** (circulates,
-15 by default, oldest auto-removed).
+- **Copy and paste work exactly as before.** ClipStack only adds a stack on the side.
+- **One hotkey pops and pastes** — macOS ⌘⌃V, Windows/Linux Ctrl+Alt+V. Bindable to plain ⌘V / Ctrl+V.
+- **History** keeps what you've popped (15 by default, circulates). **★ Star** anything to keep it forever.
+- **Formatting survives**: rich text (fonts, bold, colours, links) is captured and pasted back as-is.
+- **Private**: text only, stays on your machine, password-manager copies are never recorded.
+- Native, tiny (≈1.5 MB), no Electron, no account.
 
-Every row works the same way:
+Two implementations live here:
 
-| Action | Does |
-|---|---|
-| click the text | copy to clipboard |
-| click ☆ / ★ at the right | star / unstar |
-| ⌥-click | paste now (on a stack row: paste **and pop**) |
-| ⌘-click | remove |
+| | Where | Status |
+|---|---|---|
+| **macOS native app** (Swift, AppKit) | repo root | daily-driven, signed, custom menu rows with ☆ buttons |
+| **Cross-platform app** (Rust) — macOS, Windows, Linux | [`cross/`](cross/README.md) | builds on all three; Windows/Linux awaiting first real-machine test |
 
-The stack holds 5 items by default (`maxItems`); the oldest is dropped when a sixth is copied.
+Both read the same config and history files, so on a Mac either one can be used.
 
-Starred items are never auto-removed and never cleared by "Clear history".
-History is saved to `~/.config/clipstack/history.json` and restored on launch
-(`persistHistory` in the config; starred items are always saved).
+---
 
-## Build & install
+## Install
 
-Needs Xcode Command Line Tools (`xcode-select --install`). The script compiles with
-`swiftc` directly, so it doesn't depend on SwiftPM working (which it doesn't on some
-Command Line Tools-only installs). `Package.swift` is there for opening the project in Xcode.
+### Windows, Linux, macOS — via npm
+
+```bash
+npx clipstack install
+```
+
+Copies the binary for your platform to a stable location, registers it to start at login,
+launches it. `npx clipstack uninstall` reverses it. See [`cross/README.md`](cross/README.md)
+for platform details (Wayland users: read the note there).
+
+> Not published yet — see [PUBLISHING.md](PUBLISHING.md).
+
+### macOS native app — from source
+
+Needs Xcode Command Line Tools (`xcode-select --install`).
 
 ```bash
 ./make-app.sh --install
 ```
 
-That builds `build/ClipStack.app`, copies it to `/Applications`, and launches it.
-Run `./make-app.sh` without the flag to just build.
+Builds `build/ClipStack.app`, copies it to `/Applications` and launches it. First launch asks
+for **Accessibility** (System Settings → Privacy & Security → Accessibility) — that's what
+lets it paste for you. Add to Login Items to start at boot.
 
-First launch: macOS asks for **Accessibility** access. Allow it in
-System Settings → Privacy & Security → Accessibility. Without it the app still records
-copies and puts the popped item on the clipboard, but it can't press ⌘V for you.
+The script signs with your Developer ID / Apple Development certificate if you have one,
+which keeps the Accessibility grant across rebuilds. Unsigned builds get re-asked after
+every rebuild.
 
-To start it at login: System Settings → General → Login Items → **+** → ClipStack.
+---
 
-## Customise
+## Using it
 
-The config lives at `~/.config/clipstack/config.json` (created on first run; also reachable
-from the menu via **Edit config…**). After editing, choose **Reload config** from the menu.
+| Key (macOS / Win+Linux) | Does |
+|---|---|
+| ⌘C / Ctrl+C | normal copy — *also* pushes onto the stack |
+| ⌘V / Ctrl+V | normal paste, unchanged |
+| **⌘⌃V** / **Ctrl+Alt+V** | pop and paste (newest first, or oldest first in FIFO mode) |
+| ⌘⌃⇧V / Ctrl+Alt+Shift+V | pop from the *other* end |
+| ⌘⌃⌫ / Ctrl+Alt+Backspace | clear the stack |
+| ⌘⌃L / Ctrl+Alt+L | open the menu |
+
+With an empty stack the paste hotkey behaves as a normal paste.
+
+### The menu (📋)
+
+- **Paste order** — one click switches LIFO ↔ FIFO (saved to config).
+- **Stack** — not yet pasted. **★ Starred** — kept forever. **History** — circulates.
+- macOS app: click a row to copy it · **☆** button stars it · ⌥-click pastes · ⌘-click removes.
+- Cross-platform app: click a row to copy it; Paste / Star / Remove submenus.
+- *Clear stack* keeps history; *Clear history* keeps starred items.
+
+### Config
+
+`~/.config/clipstack/config.json` (macOS/Linux) · `%APPDATA%\clipstack\config.json` (Windows).
+Created on first run; **Edit config…** opens it, **Reload config** applies it.
 
 ```json
 {
   "maxItems": 5,
   "maxHistory": 15,
+  "pasteOrder": "lifo",
   "persistHistory": true,
   "pollInterval": 0.2,
   "showCountInMenubar": true,
@@ -67,21 +101,46 @@ from the menu via **Edit config…**). After editing, choose **Reload config** f
 }
 ```
 
-You can bind the paste key to plain `"cmd+v"` if you like: ⌘V then pops from the stack
-when it has items and behaves as a normal paste when it's empty. (ClipStack watches the
-keystroke on its way to the app and swaps the clipboard first — the app does the pasting,
-so this works everywhere ⌘V works.)
+| Key | Meaning |
+|---|---|
+| `maxItems` | stack size; oldest dropped when exceeded |
+| `maxHistory` | history size; starred items don't count |
+| `pasteOrder` | `"lifo"` newest first · `"fifo"` oldest first (for the main hotkey) |
+| `persistHistory` | save history across restarts (starred always saved) |
+| `hotkeys.*` | modifiers joined with `+`, then the key: `cmd`/`win`/`super`, `ctrl`, `alt`/`option`, `shift`; keys `a`–`z`, `0`–`9`, `f1`–`f12`, `space`, `return`, `tab`, `escape`, `backspace`, arrows, punctuation. `""` disables. |
 
-Hotkey format: modifiers joined with `+`, then the key.
-Modifiers: `cmd`, `ctrl`, `alt` (or `option`), `shift`.
-Keys: `a`–`z`, `0`–`9`, `f1`–`f12`, `space`, `return`, `tab`, `escape`, `backspace`,
-`up`, `down`, `left`, `right`, and `- = [ ] ; ' , . / \ `` ` ``.
-Set a hotkey to `""` to disable it.
+You can bind `pasteNewest` to plain `cmd+v` / `ctrl+v`: it then pops when the stack has
+items and pastes normally when it's empty (macOS and Windows; not on Linux).
 
-## Notes
+---
 
-- Text only. Images and files are ignored.
-- Items marked as concealed by password managers are never recorded.
-- Global hotkeys registered this way take priority over an app's own shortcut with the same keys.
-- Not sandboxed (Accessibility + synthetic keystrokes aren't allowed in the App Sandbox), so
-  this can't be distributed through the Mac App Store as-is.
+## How the paste actually happens
+
+The interesting part. A naïve clipboard tool grabs your hotkey and *sends a fake ⌘V*. That
+breaks in two ways: a still-held Control key corrupts the fake keystroke, and binding plain
+⌘V is impossible because the tool swallows it. ClipStack instead watches the keystroke on
+its way to the app, swaps the clipboard, and lets **your own keystroke** continue as a
+plain paste — the app in front does the pasting, so it works everywhere ⌘V works.
+
+| Platform | Mechanism |
+|---|---|
+| macOS | CGEvent tap — rewrites ⌘⌃V into ⌘V in place |
+| Windows | low-level keyboard hook — Ctrl+V passes through after the swap; other chords use a synthetic Ctrl+V sent once Alt/Shift are released |
+| Linux X11 | global hotkey + synthetic Ctrl+V |
+| Linux Wayland | no global hotkeys for apps; bind a desktop shortcut to `clipstack pop` |
+
+---
+
+## Layout
+
+```
+Sources/ClipStack/     macOS Swift app (AppDelegate, Store, KeyTap, Paster, RowView, Config)
+make-app.sh            builds + signs + installs the macOS .app
+cross/                 Rust app for macOS/Windows/Linux + npm wrapper + CI
+.github/workflows/     release pipeline: binaries for 5 targets, npm publish on tag
+PUBLISHING.md          how to release
+```
+
+## Licence
+
+MIT

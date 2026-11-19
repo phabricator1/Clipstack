@@ -46,6 +46,7 @@ if [[ "${1:-}" == "--install" ]]; then
     pkill -x ClipStack 2>/dev/null || true
     rm -rf "/Applications/ClipStack.app"
     cp -R "$APP" "/Applications/ClipStack.app"
-    open "/Applications/ClipStack.app"
+    # LaunchServices occasionally refuses (-600) right after the old process was killed; retry once.
+    open "/Applications/ClipStack.app" || { sleep 1; open "/Applications/ClipStack.app"; }
     echo "Installed and launched /Applications/ClipStack.app"
 fi

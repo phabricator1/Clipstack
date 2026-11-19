@@ -124,7 +124,9 @@ impl Shared {
                 if autorepeat {
                     return HookDecision::Swallow; // holding the key must not drain the stack
                 }
-                let popped = if action == HotAction::PasteNewest {
+                // The primary key follows the configured order; the secondary takes the other end.
+                let take_newest = (action == HotAction::PasteNewest) != self.config.is_fifo();
+                let popped = if take_newest {
                     self.store.pop_newest()
                 } else {
                     self.store.pop_oldest()

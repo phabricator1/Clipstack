@@ -16,6 +16,10 @@ pub struct Config {
     pub poll_interval: f64,
     /// Show the stack count next to the tray icon (macOS title / Windows+Linux tooltip).
     pub show_count_in_menubar: bool,
+    /// Which end of the stack the main paste hotkey takes: "lifo" (newest first, default)
+    /// or "fifo" (oldest first — paste in the order you copied). The second paste hotkey
+    /// always takes the other end. Also switchable from the menu.
+    pub paste_order: String,
     pub hotkeys: Hotkeys,
 }
 
@@ -63,12 +67,17 @@ impl Default for Config {
             persist_history: true,
             poll_interval: 0.2,
             show_count_in_menubar: true,
+            paste_order: "lifo".into(),
             hotkeys: Hotkeys::default(),
         }
     }
 }
 
 impl Config {
+    pub fn is_fifo(&self) -> bool {
+        self.paste_order.eq_ignore_ascii_case("fifo")
+    }
+
     /// ~/.config/clipstack on macOS and Linux, %APPDATA%\clipstack on Windows.
     pub fn dir() -> PathBuf {
         #[cfg(windows)]
