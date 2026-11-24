@@ -20,6 +20,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 mv build/ClipStack "$APP/Contents/MacOS/ClipStack"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp assets/menubar-36.png "$APP/Contents/Resources/menubar.png"
 
 # Sign with a real certificate when one is available. macOS ties the Accessibility
 # grant to the signing identity: with an ad-hoc signature that identity is the hash

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Monochrome template glyph for the macOS menubar / tray: same clipboard-stack, strokes only.
+       Black on transparent; macOS recolours template images for light/dark menubars. -->
+  <g fill="none" stroke="#000000" stroke-width="72" stroke-linecap="round" stroke-linejoin="round">
+    <!-- back boards -->
+    <path d="M392 212 H704 Q760 212 760 268 V640"/>
+    <path d="M296 300 H624 Q680 300 680 356 V740"/>
+    <!-- front board -->
+    <rect x="160" y="400" width="440" height="500" rx="56"/>
+    <!-- clip -->
+    <path d="M300 400 V372 Q300 340 332 340 H428 Q460 340 460 372 V400"/>
+    <!-- lines -->
+    <path d="M256 560 H504"/>
+    <path d="M256 660 H464"/>
+    <path d="M256 760 H424"/>
+  </g>
+</svg>

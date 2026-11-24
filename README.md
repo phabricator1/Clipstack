@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/icon-256.png" width="128" alt="ClipStack icon"></p>
+
 # ClipStack
 
 **A clipboard stack for your menubar / tray — macOS, Windows, Linux.**

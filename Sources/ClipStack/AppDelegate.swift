@@ -45,6 +45,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.menu = NSMenu()
         statusItem.menu?.delegate = self
+        if let button = statusItem.button, let glyph = menubarGlyph() {
+            button.image = glyph
+            button.imagePosition = .imageLeading
+        }
         updateMenubarTitle()
 
         applyConfig()
@@ -240,13 +244,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Menubar
 
+    /// The bundled template glyph (menubar.png, 36 px drawn at 18 pt so it is crisp on
+    /// Retina). As a template image macOS recolours it for light/dark menubars.
+    private func menubarGlyph() -> NSImage? {
+        guard let url = Bundle.main.url(forResource: "menubar", withExtension: "png"),
+              let image = NSImage(contentsOf: url) else { return nil }
+        image.size = NSSize(width: 18, height: 18)
+        image.isTemplate = true
+        return image
+    }
+
     private func updateMenubarTitle() {
         guard let button = statusItem.button else { return }
         let count = store.stackCount
+        let hasGlyph = button.image != nil
         if config.showCountInMenubar && count > 0 {
-            button.title = "📋\(count)"
+            button.title = hasGlyph ? " \(count)" : "📋\(count)"
         } else {
-            button.title = "📋"
+            button.title = hasGlyph ? "" : "📋"
         }
     }
 
