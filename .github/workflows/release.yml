@@ -16,11 +16,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-latest       # arm64 runner
             target: aarch64-apple-darwin
             npm_os: darwin
             npm_arch: arm64
-          - os: macos-14            # Intel binary cross-compiled on the arm64 runner (macos-13 is retired)
+          - os: macos-latest       # Intel binary cross-compiled on the arm64 runner (macos-13/14 are retired)
             target: x86_64-apple-darwin
             npm_os: darwin
             npm_arch: x64
