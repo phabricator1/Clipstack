@@ -38,7 +38,7 @@ function requireBinary() {
   fail(
     `no prebuilt binary for ${process.platform}-${process.arch}.\n` +
     `  Supported: ${Object.keys(PKG.optionalDependencies).map((n) => n.replace('@clipstack/', '')).join(', ')}\n` +
-    `  Build from source instead: https://github.com/sharbuz/clipstack#build-from-source`,
+    `  Build from source instead: https://github.com/phabricator1/Clipstack#build-from-source`,
   );
 }
 

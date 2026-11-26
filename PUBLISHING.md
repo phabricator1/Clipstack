@@ -23,7 +23,7 @@ The binaries are published as `@clipstack/<os>-<arch>` and the installer as `cli
 1. Create / sign in to your npm account at npmjs.com.
 2. Create an **organisation** named `clipstack` (npmjs.com → avatar → *Add Organization* →
    free/public). That reserves the `@clipstack` scope.
-   *If the name is taken, pick another scope (e.g. `@sharbuz`) and tell Claude — the five
+   *If the name is taken, pick another scope (e.g. `@phabricator1`) and tell Claude — the five
    `optionalDependencies` in `cross/npm/clipstack/package.json` and the scope in
    `cross/npm/scripts/make-platform-package.js` need the same change.*
 3. Create an **automation token**: avatar → *Access Tokens* → *Generate New Token* →
