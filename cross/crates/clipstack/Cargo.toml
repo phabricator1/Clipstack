@@ -1,6 +1,6 @@
 [package]
 name = "clipstack"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "A clipboard stack for your menubar / tray: every copy is pushed, one hotkey pops and pastes."
 license = "MIT"

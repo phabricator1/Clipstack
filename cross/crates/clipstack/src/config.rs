@@ -79,7 +79,11 @@ impl Config {
     }
 
     /// ~/.config/clipstack on macOS and Linux, %APPDATA%\clipstack on Windows.
+    /// `CLIPSTACK_CONFIG_DIR` overrides it (used by tests and for running a second copy).
     pub fn dir() -> PathBuf {
+        if let Some(d) = std::env::var_os("CLIPSTACK_CONFIG_DIR") {
+            return PathBuf::from(d);
+        }
         #[cfg(windows)]
         {
             dirs::config_dir()

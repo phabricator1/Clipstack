@@ -130,7 +130,9 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/or
 
 KDE: System Settings → Shortcuts → Custom Shortcuts → New → Command: `~/.local/bin/clipstack pop`.
 
-`clipstack pop` puts the next item on the clipboard; you then press Ctrl+V as usual.
+`clipstack pop` hands the request to the running tray app, which puts the next item on the
+clipboard (about 50 ms); you then press Ctrl+V as usual. If the tray app is not running, the
+command works on the saved history directly instead.
 
 ---
 

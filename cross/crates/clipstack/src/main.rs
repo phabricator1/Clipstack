@@ -8,6 +8,7 @@
 mod app;
 mod config;
 mod hotkey;
+mod ipc;
 mod paste;
 mod platform;
 mod store;
@@ -43,13 +44,15 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     // `clipstack pop` / `clipstack pop-oldest` / `clipstack clear`: one-shot commands for
-    // desktop shortcuts on Wayland, where global hotkeys are unavailable. They talk to the
-    // running instance through the history file; the instance picks the change up.
+    // desktop shortcuts on Wayland, where global hotkeys are unavailable. They are handed
+    // to the running tray through a command file (see ipc.rs); without a tray they act on
+    // the clipboard and the history file directly.
     if let Some(cmd) = std::env::args().nth(1) {
         std::process::exit(cli::run(&cmd));
     }
 
     *SHARED.lock().unwrap() = Some(Shared::new());
+    ipc::discard_stale();
 
     let event_loop = EventLoopBuilder::new().build();
     let mut ctx = Ctx {
@@ -145,6 +148,7 @@ impl Ctx {
         }
 
         self.poll_clipboard();
+        self.drain_commands();
         self.drain_hotkey_events();
         self.drain_menu_events();
         self.drain_pending();
@@ -283,6 +287,35 @@ impl Ctx {
         }
     }
 
+    /// Commands dropped off by `clipstack pop` etc. (see ipc.rs). They put the item on the
+    /// clipboard quietly, like a hotkey does, but never paste: the CLI is used from desktop
+    /// shortcuts where the user presses Ctrl+V themselves afterwards.
+    fn drain_commands(&mut self) {
+        for cmd in ipc::drain() {
+            let mut guard = SHARED.lock().unwrap();
+            let shared = guard.as_mut().unwrap();
+            match cmd.as_str() {
+                "pop" | "pop-oldest" => {
+                    let item = if cmd == "pop" { shared.store.pop_newest() } else { shared.store.pop_oldest() };
+                    shared.menu_dirty = true;
+                    match item {
+                        Some(it) => {
+                            shared.set_clipboard_quietly(&it);
+                            log::info!("cli {cmd}: {} chars -> clipboard, stack={}", it.text.chars().count(), shared.store.stack_count());
+                        }
+                        None => log::info!("cli {cmd}: stack empty"),
+                    }
+                }
+                "clear" => {
+                    shared.store.clear_stack();
+                    shared.menu_dirty = true;
+                    log::info!("cli clear: stack emptied");
+                }
+                other => log::warn!("ignoring unknown command file: {other:?}"),
+            }
+        }
+    }
+
     fn drain_pending(&mut self) {
         let mut guard = SHARED.lock().unwrap();
         let shared = guard.as_mut().unwrap();
@@ -338,36 +371,25 @@ fn open_path(path: &std::path::Path) {
 
 /// One-shot subcommands for desktop shortcuts (mainly Linux/Wayland).
 mod cli {
+    use std::time::Duration;
+
     use crate::config::Config;
+    use crate::ipc;
     use crate::store::Store;
+
+    /// How long to wait for a running tray to pick the command up. The tray ticks every
+    /// 50 ms, so anything much longer than that means no tray is running.
+    const HANDOFF_TIMEOUT: Duration = Duration::from_millis(600);
 
     pub fn run(cmd: &str) -> i32 {
         match cmd {
-            "pop" | "pop-oldest" => {
-                let c = Config::load();
-                let mut store = Store::new(c.max_items, c.max_history, c.persist_history);
-                let item = if cmd == "pop" { store.pop_newest() } else { store.pop_oldest() };
-                store.save_if_dirty();
-                match item {
-                    Some(it) => {
-                        let r = arboard::Clipboard::new().and_then(|mut cb| match it.html {
-                            Some(html) => cb.set_html(html, Some(it.text)),
-                            None => cb.set_text(it.text),
-                        });
-                        match r {
-                            Ok(()) => 0,
-                            Err(e) => { eprintln!("clipboard: {e}"); 1 }
-                        }
-                    }
-                    None => { eprintln!("stack empty"); 0 }
+            "pop" | "pop-oldest" | "clear" => {
+                match ipc::send(cmd, HANDOFF_TIMEOUT) {
+                    Ok(true) => return 0, // the tray did it
+                    Ok(false) => {}       // no tray running: do it here
+                    Err(e) => eprintln!("clipstack: could not hand off to the tray ({e}); acting directly"),
                 }
-            }
-            "clear" => {
-                let c = Config::load();
-                let mut store = Store::new(c.max_items, c.max_history, c.persist_history);
-                store.clear_stack();
-                store.save_if_dirty();
-                0
+                direct(cmd)
             }
             "config-path" => { println!("{}", Config::file().display()); 0 }
             "--version" | "-V" => { println!("clipstack {}", env!("CARGO_PKG_VERSION")); 0 }
@@ -375,6 +397,32 @@ mod cli {
                 eprintln!("usage: clipstack [pop | pop-oldest | clear | config-path | --version]\n       (no arguments starts the tray app)");
                 2
             }
+        }
+    }
+
+    /// Fallback when no tray is running: operate on the history file and clipboard directly.
+    fn direct(cmd: &str) -> i32 {
+        let c = Config::load();
+        let mut store = Store::new(c.max_items, c.max_history, c.persist_history);
+        if cmd == "clear" {
+            store.clear_stack();
+            store.save_if_dirty();
+            return 0;
+        }
+        let item = if cmd == "pop" { store.pop_newest() } else { store.pop_oldest() };
+        store.save_if_dirty();
+        match item {
+            Some(it) => {
+                let r = arboard::Clipboard::new().and_then(|mut cb| match it.html {
+                    Some(html) => cb.set_html(html, Some(it.text)),
+                    None => cb.set_text(it.text),
+                });
+                match r {
+                    Ok(()) => 0,
+                    Err(e) => { eprintln!("clipboard: {e}"); 1 }
+                }
+            }
+            None => { eprintln!("stack empty"); 0 }
         }
     }
 }

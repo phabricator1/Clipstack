@@ -76,6 +76,10 @@ clipstack clear        empty the stack
 clipstack config-path
 ```
 
+`pop`, `pop-oldest` and `clear` are handed to the running tray app through a command file in
+`<config dir>/commands/`, so the tray stays the single owner of the clipboard and the history
+file. Without a running tray they fall back to acting on the history file directly.
+
 ## Build from source
 
 Needs Rust (https://rustup.rs). On Linux also:
